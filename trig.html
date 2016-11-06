@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<style>
+body{
+	width:100%;
+	height:100%;
+}
+
+#canvas {
+    position: absolute;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin:auto;
+}
+</style>
+
+<body>
+
+<canvas id="canvas" width="800" height="800" style="border:4px solid #d3d3d3;"></canvas>
+
+</body>
+
+<script src="http://cdnjs.cloudflare.com/ajax/libs/mathjs/3.2.1/math.min.js"></script>
+
+<script>
+var keys = [];
+window.onkeyup = function(e) {keys[e.keyCode]=false;}
+window.onkeydown = function(e) {keys[e.keyCode]=true;}
+//a - 65
+//d - 68
+//w - 87
+//s - 83
+
+var c = document.getElementById("canvas");
+var ctx = c.getContext("2d");
+var scale = 200;
+var offset = 400;
+var moveSpeed = 2;
+var zoomSpeed = 30;
+var slowRate = 0.95;
+var points = [];
+var linesDrawn = [];
+var subDiv = 3;
+var curFunc;
+function genPoints(mathFunc) {
+	points = [];
+	curFunc = mathFunc;
+	for(var x = -1; x <= 1; x += 1 / subDiv)
+		for(var y = -1; y <= 1; y += 1 / subDiv)
+			{
+				points.push([x, y, mathFunc(x, y)]);
+			}
+			
+	linesDrawn = [];
+	for(var i=0; i<points.length; i++)
+	{
+		for(var j=i+1; j<points.length; j++)
+		{
+			var v1 = points[i];
+			var v2 = points[j];
+			if(v1 == v2) continue;
+			var d2 = distance2(v1, v2);
+			if(d2 > 1 / subDiv) continue;
+			linesDrawn.push([v1, v2]);
+		}
+	}
+}
+genPoints(function(x,y){return Math.sin(x*x+y*y);});
+	
+var lastTime = window.performance.now();
+var deltaTime;
+var x = 0;
+var y = 0;
+
+var colors = [];
+function genColors() {
+	colors = [];
+	for(var i=0; i<points.length; i++)
+		colors.push(randColor());
+}
+genColors();
+	
+setInterval(function() {
+	deltaTime = (window.performance.now() - lastTime) / 1000;
+	lastTime = window.performance.now();
+	x *= slowRate;
+	y *= slowRate;
+	if(keys[65]) y=-moveSpeed;
+	if(keys[68]) y=moveSpeed;
+	if(keys[87]) x=moveSpeed;
+	if(keys[83]) x=-moveSpeed;
+	for(var i=0; i<linesDrawn.length; i++)
+	{
+		linesDrawn[i][0] = math.multiply(rotX(x * deltaTime), 
+					 math.multiply(rotY(y * deltaTime), linesDrawn[i][0])).toArray();
+		 linesDrawn[i][1] = math.multiply(rotX(x * deltaTime), 
+					 math.multiply(rotY(y * deltaTime), linesDrawn[i][1])).toArray();
+	}
+	paint();
+}, 1);
+
+function rotZ(t) {
+	return math.matrix([[math.cos(t), -math.sin(t), 0],
+						[math.sin(t), math.cos(t), 0],
+						[0,0,1]]);
+}
+
+function rotY(t) {
+	return math.matrix([[math.cos(t), 0, math.sin(t)],
+						[0, 1, 0],
+						[-math.sin(t), 0, math.cos(t)]]);
+}
+
+function rotX(t) {
+	return math.matrix([[1, 0, 0],
+						[0, math.cos(t), -math.sin(t)],
+						[0, math.sin(t), math.cos(t)]]);;
+}
+
+var mode = 0;
+var keyBools = [];
+function paint() {
+	if(keys[81]) //q
+		scale -= zoomSpeed * deltaTime;
+	if(keys[69]) //e
+		scale += zoomSpeed * deltaTime;
+	if(keys[90]) //z
+		mode = 0;
+	if(keys[88]) //x
+	{	
+		mode = 1;
+		genColors();
+	}
+	if(keys[67] && !keyBools[67]) //c
+	{
+		subDiv++;
+		genPoints(curFunc);
+		genColors();
+		keyBools[67] = true;
+	} else if (!keys[67] && keyBools[67]) {keyBools[67] = false;}
+	if(keys[86] && !keyBools[86] && subDiv > 1) //v
+	{
+		subDiv--;
+		genPoints(curFunc);
+		genColors();
+		keyBools[86] = true;
+	} else if (!keys[86] && keyBools[86]) {keyBools[86] = false;}
+	if(keys[66] && !keyBools[66]) //v
+	{
+		genPoints(function(x,y){return Math.sin(10*(x*x+y*y)) / 3;});
+		keyBools[66] = true;
+	} else if (!keys[66] && keyBools[66]) {keyBools[66] = false;}
+		
+		
+	if(mode == 0)
+	{
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = "#000000";
+	}
+		
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	for(var i = 0; i < linesDrawn.length; i++)
+	{
+		var v1 = linesDrawn[i][0];
+		var v2 = linesDrawn[i][1];
+		if(mode == 1)
+		{
+			ctx.strokeStyle = colors[i];
+		}
+		ctx.beginPath();
+		ctx.moveTo(offset + scale * v1[0], offset + scale * v1[1]);
+		ctx.lineTo(offset + scale * v2[0], offset + scale * v2[1]);
+		ctx.stroke();
+		ctx.closePath();
+	}
+	/**for(var i=0; i<points.length; i++)
+	{
+		for(var j=i+1; j<points.length; j++)
+		{
+			var v1 = points[i];
+			var v2 = points[j];
+			if(v1 == v2) continue;
+			var d2 = distance2(v1, v2);
+			if(d2 > 1 / subDiv) continue;
+			if(mode == 1)
+			{
+				ctx.strokeStyle = colors[i];
+			}
+			ctx.beginPath();
+			ctx.moveTo(offset + scale * v1[0], offset + scale * v1[1]);
+			ctx.lineTo(offset + scale * v2[0], offset + scale * v2[1]);
+			ctx.stroke();
+			ctx.closePath();
+		}
+	}*/
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function distance2(a, b) {
+	return Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2);
+}
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
+function randColor() {
+	return '#'+Math.floor(Math.random()*16777215).toString(16);
+}
+
+function quad(a) {
+	var quad;
+	if(Math.abs(a[0]) > Math.abs(a[1])){
+	  if(a[0] < 0)
+		quad = 1;
+	  else
+		quad = 3;
+	}else{
+	  if(a[1] < 0)
+		quad = 4;
+	  else
+		quad = 2;
+	}
+	
+	if(a[2] < 0)
+		quad += 4;
+	
+	return quad;
+}
+</script>
+</html>

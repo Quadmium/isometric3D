@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<style>
+body{
+	width:100%;
+	height:100%;
+}
+
+#canvas {
+    position: absolute;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin:auto;
+}
+</style>
+
+<body>
+
+<canvas id="canvas" width="800" height="800" style="border:4px solid #d3d3d3;"></canvas>
+
+</body>
+
+<script src="http://cdnjs.cloudflare.com/ajax/libs/mathjs/3.2.1/math.min.js"></script>
+
+<script>
+var keys = [];
+window.onkeyup = function(e) {keys[e.keyCode]=false;}
+window.onkeydown = function(e) {keys[e.keyCode]=true;}
+//a - 65
+//d - 68
+//w - 87
+//s - 83
+
+var c = document.getElementById("canvas");
+var ctx = c.getContext("2d");
+var scale = 200;
+var offset = 400;
+var moveSpeed = 2;
+var zoomSpeed = 30;
+var slowRate = 0.95;
+var points = [[1,1,1],
+			[1,-1,1],
+			[-1,1,1],
+			[-1,-1,1],
+			[1,1,-1],
+			[1,-1,-1],
+			[-1,1,-1],
+			[-1,-1,-1]];
+			//[0,0,2]]; //house
+			
+var lastTime = window.performance.now();
+var deltaTime;
+var x = 0;
+var y = 0;
+
+var colors = [];
+for(var i=0; i<points.length; i++)
+	colors.push(randColor());
+
+setInterval(function() {
+	deltaTime = (window.performance.now() - lastTime) / 1000;
+	lastTime = window.performance.now();
+	x *= slowRate;
+	y *= slowRate;
+	if(keys[65]) y=-moveSpeed;
+	if(keys[68]) y=moveSpeed;
+	if(keys[87]) x=moveSpeed;
+	if(keys[83]) x=-moveSpeed;
+	for(var i=0; i<points.length; i++)
+	{
+		points[i] = math.multiply(rotX(x * deltaTime), 
+					 math.multiply(rotY(y * deltaTime), points[i])).toArray();
+	}
+	paint();
+}, 1);
+
+function rotZ(t) {
+	return math.matrix([[math.cos(t), -math.sin(t), 0],
+						[math.sin(t), math.cos(t), 0],
+						[0,0,1]]);
+}
+
+function rotY(t) {
+	return math.matrix([[math.cos(t), 0, math.sin(t)],
+						[0, 1, 0],
+						[-math.sin(t), 0, math.cos(t)]]);
+}
+
+function rotX(t) {
+	return math.matrix([[1, 0, 0],
+						[0, math.cos(t), -math.sin(t)],
+						[0, math.sin(t), math.cos(t)]]);
+}
+
+var mode = 0;
+function paint() {
+	if(keys[81]) //q
+		scale -= zoomSpeed * deltaTime;
+	if(keys[69]) //e
+		scale += zoomSpeed * deltaTime;
+	if(keys[90]) //z
+		mode = 0;
+	if(keys[88]) //x
+		mode = 1;
+	if(keys[67]) //c
+		mode = 2;
+	if(keys[86]) //v
+	{
+		mode = 3;
+		colors = [];
+		for(var i=0; i<points.length; i++)
+			colors.push(randColor());
+	}
+		
+	if(mode == 0 || mode == 1)
+	{
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = "#000000";
+	}
+		
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	ctx.beginPath();
+	for(var i=0; i<points.length; i++)
+	{
+		for(var j=i+1; j<points.length; j++)
+		{
+			var v1 = points[i];
+			var v2 = points[j];
+			var d2 = distance2(v1, v2);
+			if(mode == 0 && d2 > 4.01) continue;
+			if(mode == 2 || mode == 3)
+				if(d2 > 8.01)
+				{
+					ctx.lineWidth=10;
+					ctx.strokeStyle = colors[i];
+				}
+				else
+				{
+					ctx.lineWidth=2;//ctx.strokeStyle = rgbToHex(100, 43, 256 * (d2-4) / 8);
+					if(mode == 3)
+						ctx.strokeStyle = colors[i];
+					else
+						ctx.strokeStyle = "#000000";
+				}
+			ctx.moveTo(offset + scale * v1[0], offset + scale * v1[1]);
+			ctx.lineTo(offset + scale * v2[0], offset + scale * v2[1]);
+		}
+	}
+
+	ctx.stroke();
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function distance2(a, b) {
+	return Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2);
+}
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
+function randColor() {
+	return '#'+Math.floor(Math.random()*16777215).toString(16);
+}
+
+function quad(a) {
+	var quad;
+	if(Math.abs(a[0]) > Math.abs(a[1])){
+	  if(a[0] < 0)
+		quad = 1;
+	  else
+		quad = 3;
+	}else{
+	  if(a[1] < 0)
+		quad = 4;
+	  else
+		quad = 2;
+	}
+	
+	if(a[2] < 0)
+		quad += 4;
+	
+	return quad;
+}
+</script>
+</html>
